@@ -1,0 +1,69 @@
+pipeline:
+  id: reverse-specification
+  version: 0.1.0
+  status: partial
+  executor: python -m orchestrator.reverse_specification
+  mode: read-only
+  source_roots:
+    - specs/001-gestion-commerciale/
+    - database/changelog/
+    - apex/exports/
+    - ords/definitions/
+    - public/
+  excluded_patterns:
+    - .env
+    - .env.*
+    - .git/**
+    - '**/node_modules/**'
+    - '**/*.log'
+    - '**/*.dmp'
+  steps:
+    - id: inventory
+      agent: Discovery Agent
+      output: inventory.yaml
+      status: implemented
+    - id: extract-evidence
+      agent: Reverse Engineering Agent
+      requires: [inventory]
+      output: evidence.yaml
+      status: implemented
+    - id: extract-rules
+      agent: Business Rules Agent
+      requires: [extract-evidence]
+      output: business-rules.yaml
+      status: implemented
+    - id: build-model
+      agent: Specification Agent
+      requires: [extract-rules]
+      output: business-model.yaml
+      status: implemented
+    - id: propose-architecture
+      agent: Architecture Agent
+      requires: [build-model]
+      output: target-architecture.md
+      status: implemented
+    - id: propose-migration
+      agent: Migration Agent
+      requires: [propose-architecture]
+      output: migration-proposal.yaml
+      status: partial
+    - id: define-validation
+      agent: Testing Agent
+      requires: [propose-migration]
+      output: validation-plan.yaml
+      status: partial
+    - id: review-and-report
+      agent: Review Agent
+      requires: [define-validation]
+      output: modernization-report.md
+      status: partial
+    - id: curate-knowledge
+      agent: Knowledge Agent
+      requires: [review-and-report, approve_artifact_promotion]
+      output: knowledge-entry-proposal.yaml
+      status: planned
+  output_root: generated/runs/
+  human_gates:
+    - approve_source_scope
+    - review_hypotheses_and_conflicts
+    - approve_artifact_promotion

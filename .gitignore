@@ -1,0 +1,35 @@
+# Local dependencies and environment secrets
+**/node_modules/
+**/__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+
+# Playwright outputs
+**/playwright-report/
+**/test-results/
+**/blob-report/
+
+# Build and coverage outputs
+**/dist/
+**/build/
+**/coverage/
+
+# Oracle client and test diagnostics
+*.log
+*.lst
+*.trc
+*.dmp
+*.mdmp
+
+# Unreviewed modernization runs
+generated/runs/
+
+# Local database state and backups
+/database/admin/RESUME.md
+/database/admin/backup-before-apex-ords.rcv
+
+# Operating system files
+.DS_Store
+Thumbs.db

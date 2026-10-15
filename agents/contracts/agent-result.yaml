@@ -1,0 +1,31 @@
+contract_version: 1
+result:
+  required_fields:
+    - agent_id
+    - status
+    - summary
+    - evidence
+    - assumptions
+    - errors
+    - human_approval_required
+  statuses:
+    - complete
+    - partial
+    - blocked
+  evidence_item:
+    required_fields:
+      - source_path
+      - locator
+      - classification
+    classifications:
+      - specified
+      - implemented
+      - proposed
+      - prototype_demo
+      - hypothesis
+      - conflict
+  policy:
+    source_mutation: forbidden
+    database_access: forbidden
+    secret_values_in_output: forbidden
+    draft_output_root: generated/runs/

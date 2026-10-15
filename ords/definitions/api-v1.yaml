@@ -1,0 +1,232 @@
+api:
+  name: Gestion commerciale API
+  version: v1
+  base_path: /api/v1
+  status: proposed-not-published
+  purpose: >-
+    Inventaire de conception du contrat REST ORDS. Ce fichier n'est ni une
+    définition ORDS déployable ni une spécification OpenAPI. Les schémas de
+    requête et de réponse, les formats, la pagination et les URI d'environnement
+    restent à valider avant publication.
+  principles:
+    authentication: required
+    authorization: required-for-all-operations
+    anonymous_resources: forbidden
+    direct_table_exposure: forbidden
+    business_logic_owner: PL/SQL packages
+    ords_responsibility:
+      - validate request envelope and contract format
+      - resolve authenticated identity
+      - delegate to the owning PL/SQL package
+    actor_identity: derive-from-authenticated-context; never trust a body-supplied user_id
+    mutation_idempotency: >-
+      Require an idempotency key when retrying a mutation could create a duplicate
+      document or payment. Confirm the exact operations and key format before publication.
+  response_envelope:
+    success:
+      required_fields:
+        - correlation_id
+        - resource
+        - resulting_state
+      list_fields:
+        - data
+        - filters
+        - explicit_page_or_cursor
+      schema_status: to-be-defined
+    error:
+      required_fields:
+        - code
+        - message_fr
+        - business_rule_reference
+        - affected_field_or_document
+        - expected_action
+      schema_status: to-be-defined
+      http_statuses:
+        400: invalid request format
+        401: unauthenticated
+        403: missing permission
+        404: resource absent or not visible
+        409: state, credit, stock, idempotency, or version conflict
+        422: invalid business data
+        500: unexpected error; correlation identifier only
+  operations:
+    - method: GET
+      path: /parties
+      query_parameters: [role, status, q]
+      package: PKG_GC_PARTY
+      permission: PARTY_READ
+      result: Paginated list of accessible parties.
+    - method: POST
+      path: /customers
+      package: PKG_GC_PARTY
+      permission: CUSTOMER_WRITE
+      result: Create a customer.
+    - method: POST
+      path: /suppliers
+      package: PKG_GC_PARTY
+      permission: SUPPLIER_WRITE
+      result: Create a supplier.
+    - method: GET
+      path: /products
+      query_parameters: [status, q]
+      package: PKG_GC_CATALOG
+      permission: PRODUCT_READ
+      result: Paginated product catalog.
+    - method: POST
+      path: /products
+      package: PKG_GC_CATALOG
+      permission: PRODUCT_WRITE
+      result: Create a validated product.
+    - method: GET
+      path: /price-lists/{id}/prices
+      query_parameters: [product, date, quantity]
+      package: PKG_GC_PRICING
+      permission: PRICE_READ
+      result: Applicable price in EUR.
+    - method: POST
+      path: /quotes
+      package: PKG_GC_QUOTES
+      permission: QUOTE_WRITE
+      result: Create a draft quote.
+    - method: POST
+      path: /quotes/{id}/issue
+      package: PKG_GC_QUOTES
+      permission: QUOTE_ISSUE
+      result: Issue and freeze the sent quote version.
+    - method: POST
+      path: /quotes/{id}/accept
+      package: PKG_GC_QUOTES
+      permission: QUOTE_ACCEPT
+      result: Record dated acceptance of the current quote.
+    - method: POST
+      path: /quotes/{id}/convert
+      package: PKG_GC_SALES_ORDERS
+      permission: ORDER_CREATE
+      result: Convert the quote to one sales order, at most once.
+    - method: POST
+      path: /sales-orders
+      package: PKG_GC_SALES_ORDERS
+      permission: ORDER_CREATE
+      result: Create a draft sales order.
+    - method: POST
+      path: /sales-orders/{id}/confirm
+      package: PKG_GC_SALES_ORDERS
+      permission: ORDER_CONFIRM
+      result: Check credit and stock, then confirm atomically.
+      idempotent_command: true
+    - method: POST
+      path: /sales-orders/{id}/cancel
+      package: PKG_GC_SALES_ORDERS
+      permission: ORDER_CANCEL
+      result: Cancel undelivered quantities and release reservations.
+    - method: POST
+      path: /purchase-orders
+      package: PKG_GC_PROCUREMENT
+      permission: PURCHASE_WRITE
+      result: Create and submit a purchase order.
+    - method: POST
+      path: /purchase-orders/{id}/approve
+      package: PKG_GC_PROCUREMENT
+      permission: PURCHASE_APPROVE
+      result: Record a separate approval with its reason.
+    - method: POST
+      path: /receipts
+      package: PKG_GC_PROCUREMENT
+      permission: RECEIPT_WRITE
+      result: Record a partial or complete receipt and stock movement.
+    - method: POST
+      path: /supplier-invoices
+      package: PKG_GC_PROCUREMENT
+      permission: SUPPLIER_INVOICE_WRITE
+      result: Record a supplier invoice pending reconciliation.
+    - method: POST
+      path: /supplier-invoices/{id}/validate
+      package: PKG_GC_PROCUREMENT
+      permission: SUPPLIER_INVOICE_VALIDATE
+      result: Validate duplicate, received-quantity, and price-variance checks.
+    - method: GET
+      path: /inventory/availability
+      query_parameters: [product, warehouse]
+      package: PKG_GC_INVENTORY
+      permission: STOCK_READ
+      result: Physical, reserved, and available quantities by warehouse.
+    - method: POST
+      path: /inventory/transfers
+      package: PKG_GC_INVENTORY
+      permission: STOCK_TRANSFER
+      result: Transfer stock atomically between warehouses.
+    - method: POST
+      path: /inventory/adjustments
+      package: PKG_GC_INVENTORY
+      permission: STOCK_ADJUST
+      result: Record a reasoned and audited stock adjustment.
+    - method: POST
+      path: /deliveries
+      package: PKG_GC_DELIVERY
+      permission: DELIVERY_WRITE
+      result: Prepare a delivery linked to a confirmed sales order.
+    - method: POST
+      path: /deliveries/{id}/dispatch
+      package: PKG_GC_DELIVERY
+      permission: DELIVERY_DISPATCH
+      result: Dispatch, decrease stock, and update outstanding quantities.
+      idempotent_command: true
+    - method: POST
+      path: /customer-invoices
+      package: PKG_GC_BILLING
+      permission: INVOICE_DRAFT
+      result: Prepare an invoice from billable quantities.
+    - method: POST
+      path: /customer-invoices/{id}/validate
+      package: PKG_GC_BILLING
+      permission: INVOICE_VALIDATE
+      result: Check French requirements, assign a unique reference, and freeze the document.
+      idempotent_command: true
+    - method: POST
+      path: /credit-notes
+      package: PKG_GC_BILLING
+      permission: CREDIT_NOTE_CREATE
+      result: Prepare a credit note linked to an invoice.
+      idempotent_command: true
+    - method: POST
+      path: /payments
+      package: PKG_GC_PAYMENTS
+      permission: PAYMENT_WRITE
+      result: Record a payment in EUR.
+    - method: POST
+      path: /payments/{id}/allocations
+      package: PKG_GC_PAYMENTS
+      permission: PAYMENT_ALLOCATE
+      result: Allocate a partial payment within the outstanding balance.
+      idempotent_command: true
+    - method: GET
+      path: /dashboards/{name}
+      query_parameters: [from, to]
+      package: PKG_GC_REPORTING
+      permission: Dashboard-specific permission
+      result: Aggregates filtered by period and permissions.
+    - method: GET
+      path: /audit-events
+      query_parameters: [actor, object, from, to]
+      package: PKG_GC_AUDIT
+      permission: AUDIT_READ
+      result: Paginated read-only audit events.
+    - method: POST
+      path: /users
+      package: PKG_GC_SECURITY
+      permission: USER_ADMIN
+      result: Administer a local account with audit; privileged roles require MFA.
+    - method: PUT
+      path: /users/{id}/roles
+      package: PKG_GC_SECURITY
+      permission: USER_ADMIN
+      result: Assign or revoke roles with audit; privileged roles require MFA.
+  unresolved_before_publication:
+    - request and response schemas for every operation
+    - query parameter formats, pagination limits, and date/time formats
+    - HTTP success codes and resource representations
+    - authentication mechanism and machine-principal policy
+    - idempotency key format, persistence, retention, and operation coverage
+    - stable error-code catalog and business-rule references
+    - API compatibility and deprecation policy
+    - external French e-invoicing integration contract

@@ -1,0 +1,37 @@
+schema_version: 1
+model:
+  required_fields:
+    - name
+    - evidence_status
+    - evidence
+    - assumptions
+  evidence_status_values:
+    - specified
+    - implemented
+    - prototype_demo
+    - proposed
+    - hypothesis
+    - conflict
+  implementation_status_values:
+    - absent
+    - partial
+    - present
+  entity:
+    required_fields:
+      - id
+      - name
+      - evidence_status
+      - implementation_status
+      - conceptual_tables
+      - observed_database_tables
+      - evidence
+      - assumptions
+    evidence_item_fields:
+      - source_path
+      - locator
+      - classification
+  policy:
+    invented_business_rules: forbidden
+    unsupported_claims: must_be_marked_as_hypothesis
+    secret_values: forbidden
+status: schema-only-no-business-model-generated

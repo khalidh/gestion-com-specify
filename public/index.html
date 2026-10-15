@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#123b35">
+    <meta name="description" content="Prototype de gestion commerciale pour PME">
+    <title>Lisière | Gestion commerciale</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navigation principale">
+        <a class="brand" href="#dashboard" data-view="dashboard" aria-label="Lisière, accueil">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <span class="brand-copy"><strong>lisière</strong><small>GESTION COMMERCIALE</small></span>
+        </a>
+
+        <div class="workspace-switcher">
+          <span class="workspace-avatar">ML</span>
+          <span><strong>Maison Lenoir</strong><small>Entreprise principale</small></span>
+          <span class="switch-caret" aria-hidden="true">⌄</span>
+        </div>
+
+        <div class="nav-group">
+          <p class="nav-label">PILOTAGE</p>
+          <button class="nav-item is-active" data-view="dashboard"><span class="nav-glyph">01</span>Vue d'ensemble</button>
+        </div>
+        <div class="nav-group">
+          <p class="nav-label">ACTIVITÉ</p>
+          <button class="nav-item" data-view="quotes"><span class="nav-glyph">02</span>Devis <span class="nav-count">8</span></button>
+          <button class="nav-item" data-view="orders"><span class="nav-glyph">03</span>Commandes</button>
+          <button class="nav-item" data-view="customers"><span class="nav-glyph">04</span>Clients</button>
+          <button class="nav-item" data-view="products"><span class="nav-glyph">05</span>Catalogue</button>
+          <button class="nav-item" data-view="stock"><span class="nav-glyph">06</span>Stocks <span class="nav-dot" aria-label="Alertes"></span></button>
+          <button class="nav-item" data-view="invoices"><span class="nav-glyph">07</span>Facturation</button>
+          <button class="nav-item" data-view="purchasing"><span class="nav-glyph">08</span>Achats</button>
+        </div>
+
+        <div class="sidebar-bottom">
+          <div class="help-note"><span class="help-spark">✳</span><span><strong>Besoin d'un coup de main ?</strong><small>Centre d'aide et raccourcis</small></span><span aria-hidden="true">↗</span></div>
+          <button class="user-profile" aria-label="Profil de Claire Martin">
+            <span class="user-avatar">CM</span>
+            <span><strong>Claire Martin</strong><small>Administratrice</small></span>
+            <span class="switch-caret" aria-hidden="true">···</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div class="breadcrumb"><span>Maison Lenoir</span><span aria-hidden="true">/</span><strong id="current-section">Vue d'ensemble</strong></div>
+          <div class="topbar-actions">
+            <label class="search-box"><span class="search-icon" aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Rechercher…" aria-label="Rechercher dans la vue"><kbd>⌘ K</kbd></label>
+            <button class="icon-button notification-button" aria-label="Notifications"><span aria-hidden="true">♧</span><i></i></button>
+            <span class="topbar-divider"></span>
+            <span class="today-label">Mardi 13 octobre 2026</span>
+          </div>
+        </header>
+
+        <div id="app-content" class="page-content" tabindex="-1"></div>
+        <footer class="page-footer"><span>© 2026 Maison Lenoir</span><span><i class="status-light"></i> Prototype local · données de démonstration</span></footer>
+      </main>
+    </div>
+
+    <dialog id="action-dialog" class="action-dialog">
+      <form method="dialog" class="dialog-close-form"><button class="dialog-close" aria-label="Fermer">×</button></form>
+      <div id="dialog-content"></div>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

@@ -1,0 +1,205 @@
+model:
+  name: Modele de donnees de gestion commerciale
+  version: 1
+  status: conceptual-not-deployable
+  executable: false
+  source: data-model.md
+  assumptions:
+    legal_entities: 1
+    currency: EUR
+    table_prefix: GC_
+  conventions:
+    - Physical Oracle names, types, lengths, and nullability remain subject to DBA review.
+    - Each table is expected to have a technical key and applicable creation/update audit columns.
+    - Validated documents retain immutable commercial snapshots.
+    - Audit events use a separate append-only model.
+
+domains:
+  - name: Referentiels et tarification
+    tables:
+      - name: GC_PARTY
+        attributes: [PARTY_ID, PARTY_CODE, LEGAL_NAME, DISPLAY_NAME, STATUS, VAT_ID, CREATED_AT]
+        keys: ["PK: PARTY_ID", "UNIQUE: PARTY_CODE"]
+        notes: Parent commun aux clients et fournisseurs.
+      - name: GC_PARTY_ADDRESS
+        attributes: [ADDRESS_ID, PARTY_ID, ADDRESS_TYPE, address_lines, POSTAL_CODE, CITY, COUNTRY_CODE, effective_period]
+        keys: ["PK: ADDRESS_ID", "FK: PARTY_ID -> GC_PARTY.PARTY_ID"]
+        indexes: ["PARTY_ID + ADDRESS_TYPE + validity"]
+        notes: Plusieurs adresses par tiers; noms physiques des lignes d'adresse a definir.
+      - name: GC_PARTY_CONTACT
+        attributes: [CONTACT_ID, PARTY_ID, name, function, email, phone, status]
+        keys: ["PK: CONTACT_ID", "FK: PARTY_ID -> GC_PARTY.PARTY_ID"]
+        notes: Aucune unicite globale sur le courriel.
+      - name: GC_CUSTOMER
+        attributes: [PARTY_ID, CREDIT_LIMIT_EUR, PAYMENT_TERM_ID, DEFAULT_PRICE_LIST_ID, CREDIT_STATUS]
+        keys: ["PK/FK: PARTY_ID -> GC_PARTY.PARTY_ID"]
+        notes: Extension un-a-un de GC_PARTY.
+      - name: GC_SUPPLIER
+        attributes: [PARTY_ID, PAYMENT_TERM_ID, DEFAULT_CURRENCY]
+        keys: ["PK/FK: PARTY_ID -> GC_PARTY.PARTY_ID"]
+        notes: Extension un-a-un de GC_PARTY; devise EUR imposee en v1.
+      - name: GC_PAYMENT_TERM
+        attributes: [PAYMENT_TERM_ID, code, label, days_or_offset, status]
+        keys: ["PK: PAYMENT_TERM_ID"]
+        notes: Reference par client/fournisseur et instantanee sur facture.
+      - name: GC_PRODUCT
+        attributes: [PRODUCT_ID, SKU, LABEL, PRODUCT_TYPE, UNIT_CODE, STATUS, TAX_CATEGORY_ID, STOCK_TRACKED, SAFETY_STOCK]
+        keys: ["PK: PRODUCT_ID", "UNIQUE: SKU"]
+        notes: Coherence article/service et suivi de stock a imposer.
+      - name: GC_TAX_CATEGORY
+        attributes: [TAX_CATEGORY_ID, code, label, status]
+        keys: ["PK: TAX_CATEGORY_ID", "UNIQUE: code"]
+      - name: GC_TAX_RATE
+        attributes: [TAX_RATE_ID, TAX_CATEGORY_ID, rate, start_date, end_date, country]
+        keys: ["PK: TAX_RATE_ID", "FK: TAX_CATEGORY_ID -> GC_TAX_CATEGORY.TAX_CATEGORY_ID"]
+        indexes: ["TAX_CATEGORY_ID + country + date"]
+        notes: Les periodes qui se chevauchent sont refusees par le service.
+      - name: GC_PRICE_LIST
+        attributes: [PRICE_LIST_ID, code, label, optional_party_or_segment, currency_EUR, status]
+        keys: ["PK: PRICE_LIST_ID", "UNIQUE: code"]
+        notes: Aucune autre devise admise en v1.
+      - name: GC_PRICE_RULE
+        attributes: [PRICE_RULE_ID, PRICE_LIST_ID, PRODUCT_ID, minimum_quantity, price, start_date, end_date]
+        keys: ["PK: PRICE_RULE_ID", "FK: PRICE_LIST_ID -> GC_PRICE_LIST.PRICE_LIST_ID", "FK: PRODUCT_ID -> GC_PRODUCT.PRODUCT_ID"]
+        indexes: ["PRODUCT_ID + PRICE_LIST_ID + validity"]
+        notes: Le non-chevauchement est controle sous verrou.
+
+  - name: Ventes, achats et stocks
+    tables:
+      - name: GC_QUOTE
+        attributes: [QUOTE_ID, number, CUSTOMER_ID, issue_date, expiration_date, status, totals_EUR, version]
+        keys: ["PK: QUOTE_ID", "FK: CUSTOMER_ID -> GC_CUSTOMER.PARTY_ID", "UNIQUE: number"]
+        indexes: ["CUSTOMER_ID + status + date"]
+      - name: GC_QUOTE_LINE
+        attributes: [QUOTE_LINE_ID, QUOTE_ID, PRODUCT_ID, line_number, quantity, label_snapshot, unit_snapshot, price_snapshot, discount_snapshot, tax_snapshot, net_amount_snapshot]
+        keys: ["PK: QUOTE_LINE_ID", "FK: QUOTE_ID -> GC_QUOTE.QUOTE_ID", "FK: PRODUCT_ID -> GC_PRODUCT.PRODUCT_ID", "UNIQUE: line_number within quote"]
+        notes: Quantite positive; les instantanes documentaires ne suivent pas les modifications du referentiel.
+      - name: GC_SALES_ORDER
+        attributes: [SALES_ORDER_ID, number, CUSTOMER_ID, optional_QUOTE_ID, status, dates, totals_EUR, version]
+        keys: ["PK: SALES_ORDER_ID", "FK: CUSTOMER_ID -> GC_CUSTOMER.PARTY_ID", "FK: QUOTE_ID -> GC_QUOTE.QUOTE_ID when present"]
+        indexes: ["CUSTOMER_ID + status + date"]
+        notes: Un devis ne peut etre converti qu'une fois.
+      - name: GC_SALES_ORDER_LINE
+        attributes: [SALES_ORDER_LINE_ID, SALES_ORDER_ID, optional_QUOTE_LINE_ID, PRODUCT_ID, quantity, price_snapshot, tax_snapshot, delivered_quantity, invoiced_quantity]
+        keys: ["PK: SALES_ORDER_LINE_ID", "FK: SALES_ORDER_ID -> GC_SALES_ORDER.SALES_ORDER_ID", "FK: PRODUCT_ID -> GC_PRODUCT.PRODUCT_ID"]
+        notes: Quantites livrees et facturees bornees par la quantite commandee.
+      - name: GC_PURCHASE_ORDER
+        attributes: [PURCHASE_ORDER_ID, number, SUPPLIER_ID, status, requester, approver, dates, totals_EUR]
+        keys: ["PK: PURCHASE_ORDER_ID", "FK: SUPPLIER_ID -> GC_SUPPLIER.PARTY_ID"]
+        indexes: ["SUPPLIER_ID + status + date"]
+      - name: GC_PURCHASE_ORDER_LINE
+        attributes: [PURCHASE_ORDER_LINE_ID, PURCHASE_ORDER_ID, PRODUCT_ID, quantity, price_EUR, received_quantity, tax]
+        keys: ["PK: PURCHASE_ORDER_LINE_ID", "FK: PURCHASE_ORDER_ID -> GC_PURCHASE_ORDER.PURCHASE_ORDER_ID", "FK: PRODUCT_ID -> GC_PRODUCT.PRODUCT_ID"]
+        notes: Quantite recue cumulee controlee par le service.
+      - name: GC_RECEIPT
+        attributes: [RECEIPT_ID, number, PURCHASE_ORDER_ID, WAREHOUSE_ID, status, receipt_date, receiver]
+        keys: ["PK: RECEIPT_ID", "FK: PURCHASE_ORDER_ID -> GC_PURCHASE_ORDER.PURCHASE_ORDER_ID", "FK: WAREHOUSE_ID -> GC_WAREHOUSE.WAREHOUSE_ID"]
+        indexes: ["PURCHASE_ORDER_ID + date"]
+      - name: GC_RECEIPT_LINE
+        attributes: [RECEIPT_LINE_ID, RECEIPT_ID, PURCHASE_ORDER_LINE_ID, accepted_quantity, rejected_quantity, reason]
+        keys: ["PK: RECEIPT_LINE_ID", "FK: RECEIPT_ID -> GC_RECEIPT.RECEIPT_ID", "FK: PURCHASE_ORDER_LINE_ID -> GC_PURCHASE_ORDER_LINE.PURCHASE_ORDER_LINE_ID"]
+        notes: Quantites non negatives; total limite au reliquat autorise.
+      - name: GC_WAREHOUSE
+        attributes: [WAREHOUSE_ID, code, label, status, address]
+        keys: ["PK: WAREHOUSE_ID", "UNIQUE: code"]
+      - name: GC_STOCK_BALANCE
+        attributes: [PRODUCT_ID, WAREHOUSE_ID, physical_quantity, reserved_quantity, version]
+        keys: ["PK composite: PRODUCT_ID + WAREHOUSE_ID", "FK: PRODUCT_ID -> GC_PRODUCT.PRODUCT_ID", "FK: WAREHOUSE_ID -> GC_WAREHOUSE.WAREHOUSE_ID"]
+        notes: Quantites non negatives; projection recalculable.
+      - name: GC_STOCK_MOVEMENT
+        attributes: [MOVEMENT_ID, PRODUCT_ID, WAREHOUSE_ID, movement_type, signed_quantity, origin, origin_reference, timestamp, actor, reason]
+        keys: ["PK: MOVEMENT_ID", "FK: PRODUCT_ID -> GC_PRODUCT.PRODUCT_ID", "FK: WAREHOUSE_ID -> GC_WAREHOUSE.WAREHOUSE_ID"]
+        indexes: ["PRODUCT_ID + WAREHOUSE_ID + date", "origin"]
+        notes: Journal des mouvements.
+      - name: GC_STOCK_RESERVATION
+        attributes: [RESERVATION_ID, SALES_ORDER_LINE_ID, PRODUCT_ID, WAREHOUSE_ID, quantity, status, dates]
+        keys: ["PK: RESERVATION_ID", "FK: SALES_ORDER_LINE_ID -> GC_SALES_ORDER_LINE.SALES_ORDER_LINE_ID", "FK: PRODUCT_ID -> GC_PRODUCT.PRODUCT_ID", "FK: WAREHOUSE_ID -> GC_WAREHOUSE.WAREHOUSE_ID"]
+        indexes: ["PRODUCT_ID + WAREHOUSE_ID + status"]
+        notes: Somme reservee bornee par la disponibilite.
+      - name: GC_DELIVERY
+        attributes: [DELIVERY_ID, number, SALES_ORDER_ID, status, planned_date, dispatch_date, recipient]
+        keys: ["PK: DELIVERY_ID", "FK: SALES_ORDER_ID -> GC_SALES_ORDER.SALES_ORDER_ID"]
+        indexes: ["SALES_ORDER_ID + status + date"]
+      - name: GC_DELIVERY_LINE
+        attributes: [DELIVERY_LINE_ID, DELIVERY_ID, SALES_ORDER_LINE_ID, PRODUCT_ID, WAREHOUSE_ID, shipped_quantity]
+        keys: ["PK: DELIVERY_LINE_ID", "FK: DELIVERY_ID -> GC_DELIVERY.DELIVERY_ID", "FK: SALES_ORDER_LINE_ID -> GC_SALES_ORDER_LINE.SALES_ORDER_LINE_ID"]
+        notes: Quantite expediee cumulee bornee par le reliquat de commande.
+
+  - name: Facturation et reglements
+    tables:
+      - name: GC_CUSTOMER_INVOICE
+        attributes: [CUSTOMER_INVOICE_ID, number_and_series, CUSTOMER_ID, invoice_date, due_date, status, totals_EUR, address_snapshot, legal_mentions_snapshot, validation_date]
+        keys: ["PK: CUSTOMER_INVOICE_ID", "FK: CUSTOMER_ID -> GC_CUSTOMER.PARTY_ID", "UNIQUE: series + number"]
+        indexes: ["CUSTOMER_ID + status + due_date"]
+        notes: Numero non reutilisable; politique de numerotation francaise a valider.
+      - name: GC_CUSTOMER_INVOICE_LINE
+        attributes: [CUSTOMER_INVOICE_LINE_ID, CUSTOMER_INVOICE_ID, delivery_or_source_line, PRODUCT_ID, label_snapshot, unit_snapshot, price_snapshot, discount_snapshot, tax_snapshot, quantity, amounts_EUR]
+        keys: ["PK: CUSTOMER_INVOICE_LINE_ID", "FK: CUSTOMER_INVOICE_ID -> GC_CUSTOMER_INVOICE.CUSTOMER_INVOICE_ID"]
+        notes: Lignes verrouillees apres validation.
+      - name: GC_SUPPLIER_INVOICE
+        attributes: [SUPPLIER_INVOICE_ID, SUPPLIER_ID, supplier_reference, dates, status, totals_EUR, source_order_or_receipt]
+        keys: ["PK: SUPPLIER_INVOICE_ID", "FK: SUPPLIER_ID -> GC_SUPPLIER.PARTY_ID", "UNIQUE: supplier_reference per supplier"]
+        indexes: ["SUPPLIER_ID + due_date + status"]
+      - name: GC_SUPPLIER_INVOICE_LINE
+        attributes: [SUPPLIER_INVOICE_LINE_ID, SUPPLIER_INVOICE_ID, purchase_or_receipt_line, PRODUCT_ID, quantity, price, tax, variance]
+        keys: ["PK: SUPPLIER_INVOICE_LINE_ID", "FK: SUPPLIER_INVOICE_ID -> GC_SUPPLIER_INVOICE.SUPPLIER_INVOICE_ID"]
+        notes: Ecarts avec statut d'approbation et motif.
+      - name: GC_CREDIT_NOTE
+        attributes: [CREDIT_NOTE_ID, number_and_series, source_invoice, status, date, reason, totals_EUR, validation_date]
+        keys: ["PK: CREDIT_NOTE_ID", "FK: source invoice -> GC_CUSTOMER_INVOICE.CUSTOMER_INVOICE_ID", "UNIQUE: number"]
+        notes: Cumul des avoirs borne par le montant creditable.
+      - name: GC_CREDIT_NOTE_LINE
+        attributes: [CREDIT_NOTE_LINE_ID, CREDIT_NOTE_ID, source_invoice_line, PRODUCT_ID, quantity, amounts_EUR, stock_decision]
+        keys: ["PK: CREDIT_NOTE_LINE_ID", "FK: CREDIT_NOTE_ID -> GC_CREDIT_NOTE.CREDIT_NOTE_ID"]
+        notes: Quantite creditee bornee par la quantite facturee restante.
+      - name: GC_PAYMENT
+        attributes: [PAYMENT_ID, party, customer_or_supplier_role, reference, date, method, amount_EUR, status, actor]
+        keys: ["PK: PAYMENT_ID", "FK: party -> GC_PARTY.PARTY_ID"]
+        indexes: ["party + date + status"]
+        notes: Montant strictement positif.
+      - name: GC_PAYMENT_ALLOCATION
+        attributes: [ALLOCATION_ID, PAYMENT_ID, target_document, document_type, amount_EUR, date, actor]
+        keys: ["PK: ALLOCATION_ID", "FK: PAYMENT_ID -> GC_PAYMENT.PAYMENT_ID"]
+        notes: Somme affectee <= paiement; somme recue <= solde facture.
+      - name: GC_DOCUMENT_SEQUENCE
+        attributes: [document_type, prefix, next_number, year_or_period, status]
+        keys: ["PK composite: document_type + period"]
+        notes: Acces serialise; politique reglementaire a valider avant production.
+      - name: GC_APPROVAL
+        attributes: [APPROVAL_ID, document_type, document_reference, status, requester, approver, timestamps, decision, reason]
+        keys: ["PK: APPROVAL_ID"]
+        indexes: ["status + requester + date"]
+        notes: Pour les operations sensibles, approbateur distinct du demandeur.
+
+  - name: Identites, securite et exploitation
+    tables:
+      - name: GC_USER_ACCOUNT
+        attributes: [USER_ID, normalized_login, name, status, protected_credential_verifier, last_access_date, lock_date]
+        keys: ["PK: USER_ID", "UNIQUE: normalized_login"]
+        notes: Aucun secret en clair; statut controle.
+      - name: GC_ROLE
+        attributes: [ROLE_ID, code, label, status]
+        keys: ["PK: ROLE_ID", "UNIQUE: code"]
+      - name: GC_PERMISSION
+        attributes: [PERMISSION_ID, code, functional_description]
+        keys: ["PK: PERMISSION_ID", "UNIQUE: stable code"]
+      - name: GC_USER_ROLE
+        attributes: [USER_ID, ROLE_ID, effective_dates, assigned_by]
+        keys: ["PK composite: USER_ID + ROLE_ID", "FK: USER_ID -> GC_USER_ACCOUNT.USER_ID", "FK: ROLE_ID -> GC_ROLE.ROLE_ID"]
+        notes: Historique d'attribution conserve.
+      - name: GC_ROLE_PERMISSION
+        attributes: [ROLE_ID, PERMISSION_ID]
+        keys: ["PK composite: ROLE_ID + PERMISSION_ID", "FK: ROLE_ID -> GC_ROLE.ROLE_ID", "FK: PERMISSION_ID -> GC_PERMISSION.PERMISSION_ID"]
+      - name: GC_USER_MFA_FACTOR
+        attributes: [USER_ID, approved_factor_type, encrypted_secret_or_provider_reference, status, enrollment_dates]
+        keys: ["FK: USER_ID -> GC_USER_ACCOUNT.USER_ID"]
+        notes: Requis pour administrateurs et approbateurs; secrets exclus des journaux.
+      - name: GC_AUDIT_EVENT
+        attributes: [AUDIT_EVENT_ID, actor, action, object, timestamp, result, reason, correlation, minimized_change_data]
+        keys: ["PK: AUDIT_EVENT_ID"]
+        indexes: ["object + date", "actor + date"]
+        notes: Insertion seule pour les roles applicatifs.
+      - name: GC_API_IDEMPOTENCY
+        attributes: [request_key, principal, resource, request_fingerprint, result_or_reference, expiry_date]
+        keys: ["PK composite: principal + request_key"]
+        notes: Empeche les doublons lors d'une nouvelle tentative de requete.

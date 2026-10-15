@@ -1,0 +1,49 @@
+contract_version: 1
+status: proposed-not-published
+authentication:
+  required: true
+  anonymous_access: forbidden
+  identity_source:
+    apex: SYS_CONTEXT('APEX$SESSION', 'APP_USER')
+    ords: unresolved; configure a trusted ORDS principal-to-application-user mapping
+  actor_from_request_body: forbidden
+authorization:
+  default: deny
+  resolver: GC_APP.PKG_GC_SECURITY.REQUIRE_PERMISSION
+  missing_or_unknown_identity: deny
+  missing_permission: deny-and-audit
+  direct_table_access: forbidden
+  runtime_schema_requirements:
+    - APEX and ORDS use dedicated schemas distinct from GC_APP.
+    - Runtime schemas receive no INSERT, UPDATE, or DELETE grants on business tables.
+    - Mutating package grants require each package entry point to enforce its own permission.
+  current_grants:
+    read_views:
+      - GC_APP.VW_GC_CUSTOMER_LIST
+      - GC_APP.VW_GC_STOCK_AVAILABILITY
+    execute_packages:
+      - GC_APP.PKG_GC_ERRORS
+      - GC_APP.PKG_GC_SECURITY
+    business_mutation_packages: []
+permissions:
+  USER_ADMIN: local-account-and-role-administration
+  AUDIT_READ: read-audit-events
+  STOCK_READ: read-stock-availability
+  STOCK_ADJUST: adjust-stock-with-reason
+  ORDER_APPROVE: approve-sales-order
+  INVOICE_APPROVE: approve-invoice
+  CUSTOMER_READ: read-customer-view
+mfa:
+  required_roles: [ADMINISTRATOR, APPROVER]
+  secret_storage: encrypted-factor-material-or-external-provider-reference-only
+  key_management: unresolved; requires DBA/security approval
+  recovery_process: unresolved; require security review before enabling privileged accounts
+audit:
+  append_only: true
+  denied_authorization: durable-security-event
+  successful_sensitive_operation: same-transaction-event
+  prohibited_data: [passwords, tokens, plaintext-mfa-secrets, credential-verifiers]
+deployment:
+  database_grants_file: apex/exports/application/security.sql
+  apply_requires: dedicated-isolated-schema-and-DBA-review
+  execution_allowed: false
