@@ -1,0 +1,15 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<Module version="141020000" xmlns="http://xmlns.oracle.com/Forms">
+   <FormModule Name="GC_SMOKE_TEST" DirtyInfo="false" Title="Gestion commerciale - Oracle Forms">
+      <Coordinate CharacterCellWidth="7" RealUnit="Point" DefaultFontScaling="false" CharacterCellHeight="14" CoordinateSystem="Real"/>
+      <Block Name="CONTROL" DirtyInfo="false">
+         <Item Name="STATUS" Width="430" MaximumLength="100" ItemType="Display Item" XPosition="32" FontName="Arial" YPosition="128" DatabaseItem="false" Bevel="None" FontSize="1200" DirtyInfo="false" FontWeight="Bold" ForegroundColor="gray25" CanvasName="CONTENT" Height="22" Label="Oracle Forms 14.1.2 - module autonome"/>
+         <Item Name="EXIT" Width="92" CursorStyle="hand" ItemType="Push Button" XPosition="390" FontName="Arial" YPosition="38" AccessKey="x" DirtyInfo="false" FontWeight="Bold" Label="Fermer" DefaultButton="true" CanvasName="CONTENT" Height="28">
+            <Trigger Name="WHEN-BUTTON-PRESSED" DirtyInfo="false" TriggerText="EXIT_FORM;"/>
+         </Item>
+      </Block>
+      <Canvas Name="CONTENT" ViewportXPositionOnCanvas="0" Bevel="None" DirtyInfo="false" Width="520" WindowName="MAIN_WINDOW" Height="300" ViewportHeight="300" ViewportWidth="520"/>
+      <Window Name="MAIN_WINDOW" ClearAllowed="true" Bevel="None" MaximizeAllowed="false" DirtyInfo="false" MinimizeAllowed="false" Title="Gestion commerciale - test Forms" Width="520" Centered="true" Height="300" ResizeAllowed="false" ShowTitlebar="true"/>
+      <Trigger Name="WHEN-WINDOW-CLOSED" DirtyInfo="false" TriggerText="EXIT_FORM;"/>
+   </FormModule>
+</Module>
