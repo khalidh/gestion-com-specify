@@ -48,6 +48,7 @@ ARTIFACT_FILENAMES = (
     "validation-plan.yaml",
     "modernization-report.md",
 )
+TARGETS = ("apex", "oracle-forms")
 
 RULE_PATTERN = re.compile(r"^\s*-\s+\*\*(BR-\d{3})\*\*\s*(.*)$")
 REFERENCE_PATTERN = re.compile(r"\b(?:FR|TEST)-\d{3}\b")
@@ -298,6 +299,19 @@ def _build_entities(
 def _build_migration_proposal(
     tasks: dict[str, dict[str, Any]], metadata: dict[str, Any]
 ) -> dict[str, Any]:
+    if metadata["target"] == "oracle-forms":
+        return {
+            "metadata": metadata,
+            "target": "oracle-forms",
+            "status": "blocked_missing_target_plan",
+            "execution_allowed": False,
+            "limitation": (
+                "The existing implementation tasks describe APEX pages, not Oracle Forms modules. "
+                "A target-specific task plan must be approved before Forms work is proposed."
+            ),
+            "steps": [],
+        }
+
     steps: list[dict[str, Any]] = []
     for step_id, title, task_ids in MIGRATION_TASK_GROUPS:
         sourced_tasks = [tasks[task_id] for task_id in task_ids if task_id in tasks]
@@ -393,8 +407,16 @@ def _review_artifacts(artifacts: dict[str, Any]) -> dict[str, Any]:
                 "id": "REV-101",
                 "severity": "medium",
                 "status": "open",
-                "summary": "No Oracle Forms source is in the analyzed manifest; Forms conversion cannot be reviewed.",
-                "evidence": ["migration-proposal.yaml:limitation", "inventory.yaml:sources"],
+                "summary": (
+                    "No Oracle Forms source is in the analyzed manifest; Forms conversion cannot be reviewed."
+                    if metadata["target"] == "apex"
+                    else "Oracle Forms runtime/version and target-specific implementation plan remain unresolved."
+                ),
+                "evidence": (
+                    ["migration-proposal.yaml:limitation", "inventory.yaml:sources"]
+                    if metadata["target"] == "apex"
+                    else ["target-architecture.md:Contraintes non résolues", "migration-proposal.yaml:limitation"]
+                ),
             },
             {
                 "id": "REV-102",
@@ -430,6 +452,7 @@ def _render_report(artifacts: dict[str, Any]) -> str:
     proposal = artifacts["migration_proposal"]
     validation_plan = artifacts["validation_plan"]
     review = artifacts["review"]
+    target_label = "Oracle Forms" if inventory["metadata"]["target"] == "oracle-forms" else "APEX"
     rows = [
         "| Entité | Tables conceptuelles | Tables du DDL analysé | Démo navigateur | État constaté |",
         "|---|---|---|---|---|",
@@ -455,7 +478,12 @@ def _render_report(artifacts: dict[str, Any]) -> str:
     migration_lines = [
         f"- **{step['title']}** : tâches existantes {', '.join(task['id'] for task in step['tasks'])}."
         for step in proposal["steps"]
-    ] or ["- Aucune tâche correspondante n'a été trouvée dans le plan de tâches autorisé."]
+    ] or [f"- {proposal['limitation']}"]
+    platform_observation = (
+        "- **Oracle Forms** : la cible est sélectionnée pour cette proposition; aucun module Forms n'est généré et son runtime reste à confirmer."
+        if inventory["metadata"]["target"] == "oracle-forms"
+        else "- **Oracle Forms** : aucune conversion n'est évaluée; le workflow ne lit que les chemins allowlistés du manifeste."
+    )
     review_check_lines = [
         f"- `{check['id']}` : {check['status']}." for check in review["checks"]
     ]
@@ -485,10 +513,10 @@ def _render_report(artifacts: dict[str, Any]) -> str:
             "## Écarts observés",
             *gaps,
             f"- **ORDS** : statut documentaire `{artifacts['ords_status']}` ; ce statut ne prouve pas qu'une API est déployée.",
-            "- **Oracle Forms** : aucune conversion n'est évaluée ; le workflow ne lit que les chemins allowlistés du manifeste.",
+            platform_observation,
             "",
-            "## Étapes APEX proposées",
-            "Les éléments ci-dessous reprennent les IDs du plan de tâches existant et restent soumis à ses gates.",
+            f"## Étapes {target_label} proposées",
+            "Les propositions restent soumises à revue humaine et ne sont pas exécutables.",
             *migration_lines,
             "",
             "## Validation proposée",
@@ -511,7 +539,7 @@ def _render_report(artifacts: dict[str, Any]) -> str:
 
 
 def _render_architecture_proposal(
-    specification: str, implementation_plan: str, metadata: dict[str, Any]
+    specification: str, implementation_plan: str, metadata: dict[str, Any], target: str
 ) -> str:
     validated_line = _line_number(specification, "**Validated**")
     summary_line = _line_number(implementation_plan, "## Summary")
@@ -524,7 +552,27 @@ def _render_architecture_proposal(
     type_locator = f"{SOURCE_FILES['implementation_plan'][0]}:L{project_type_line}" if project_type_line else SOURCE_FILES["implementation_plan"][0]
     platform_locator = f"{SOURCE_FILES['implementation_plan'][0]}:L{target_platform_line}" if target_platform_line else SOURCE_FILES["implementation_plan"][0]
 
-    if design_available:
+    if target == "oracle-forms":
+        status = "draft_target_profile_pending"
+        architecture_section = "\n".join(
+            [
+                "## Proposition de découpage Oracle Forms",
+                "",
+                "- **Présentation** : proposer des modules Forms par parcours métier, à détailler après validation des écrans et des rôles.",
+                "- **Métier** : conserver les règles et transitions dans des packages PL/SQL; les modules Forms les invoquent sans devenir leur source de vérité.",
+                "- **Données** : s'appuyer sur le modèle conceptuel comme entrée de conception, pas comme schéma déployable.",
+                "- **Portée** : proposition issue des spécifications; aucun fichier `.fmb`/`.fmx`, code PL/SQL ou changement de base n'est généré.",
+                "",
+                "## Contraintes non résolues",
+                "- Version Oracle Forms/Reports et niveau de correctif à confirmer.",
+                "- Format de livraison des modules, runtime, topologie d'hébergement et authentification à confirmer.",
+                "- Plan de tâches spécifique Forms à approuver; les tâches existantes décrivent des pages APEX.",
+                f"- Les gates réglementaires, de sécurité et d'exploitation restent à lever (`{plan_locator}`).",
+                f"- La validation de la spécification (`{spec_locator}`) ne vaut pas approbation de cette nouvelle cible.",
+                "",
+            ]
+        )
+    elif design_available:
         architecture_section = "\n".join(
             [
                 "## Architecture proposée pour revue",
@@ -578,8 +626,12 @@ def _render_architecture_proposal(
     )
 
 
-def analyze_repository(repo_root: Path, run_id: str | None = None) -> dict[str, Any]:
+def analyze_repository(
+    repo_root: Path, run_id: str | None = None, target: str = "apex"
+) -> dict[str, Any]:
     """Analyze fixed, allowlisted sources and return drafts without writing files."""
+    if target not in TARGETS:
+        raise AnalysisError(f"Unsupported target: {target}. Choose one of: {', '.join(TARGETS)}.")
     chosen_run_id = run_id or datetime.now(timezone.utc).strftime("run-%Y%m%dT%H%M%S%fZ")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", chosen_run_id) or ".." in chosen_run_id:
         raise AnalysisError("Run ID must be a simple name without path separators or '..'.")
@@ -596,6 +648,7 @@ def analyze_repository(repo_root: Path, run_id: str | None = None) -> dict[str, 
     manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
     metadata = {
         "workflow_id": "reverse-specification",
+        "target": target,
         "run_id": chosen_run_id,
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "approval_status": "pending_human_review",
@@ -626,7 +679,7 @@ def analyze_repository(repo_root: Path, run_id: str | None = None) -> dict[str, 
         "business_model": {"metadata": metadata, "status": "draft", "entities": entities},
         "migration_proposal": migration_proposal,
         "target_architecture": _render_architecture_proposal(
-            sources["specification"], sources["implementation_plan"], metadata
+            sources["specification"], sources["implementation_plan"], metadata, target
         ),
         "validation_plan": {
             "metadata": metadata,
@@ -684,9 +737,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Create an evidence-linked, read-only modernization report.")
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--run-id", help="Optional unique output folder name; path separators are rejected.")
+    parser.add_argument("--target", choices=TARGETS, default="apex", help="Target profile for the proposal.")
     arguments = parser.parse_args(argv)
     try:
-        artifacts = analyze_repository(arguments.repo_root, arguments.run_id)
+        artifacts = analyze_repository(arguments.repo_root, arguments.run_id, arguments.target)
         output_dir = write_run(arguments.repo_root, artifacts)
     except (AnalysisError, OSError, yaml.YAMLError) as error:
         print(f"Analyse bloquée : {error}", file=sys.stderr)

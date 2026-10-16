@@ -1,0 +1,33 @@
+profile:
+  id: oracle-forms
+  status: approved_for_planning
+  approval_date: 2026-10-16
+  approval_scope: target_architecture_direction_and_planning_only
+  approval_source: explicit_user_instruction_in_current_conversation
+  replaces_existing_apex_target: false
+  implementation_authorized: false
+
+architecture:
+  presentation: Oracle Forms
+  business_logic: existing_or_approved_oracle_plsql_packages
+  data_model: ../../data-model.yaml
+  business_specification: ../../spec.md
+  direct_table_mutation_from_forms: forbidden
+  ords_dependency: not_assumed
+
+technical_decisions:
+  oracle_database_version: pending_environment_inventory
+  oracle_forms_reports_version_and_patch: pending
+  module_source_and_compilation_format: pending_version_confirmation
+  runtime_and_hosting_topology: pending
+  authentication_and_database_identity_context: pending
+  reporting_tool_and_delivery: pending
+  forms_ui_test_automation: pending_runtime_selection
+  supported_desktop_clients: pending
+
+governance:
+  constitution_exception:
+    status: formal_exception_required_before_implementation
+    scope: oracle_forms_as_an_alternative_presentation_target_for_this_feature
+    constitution_reference: .specify/memory/constitution.md
+  next_gate: resolve_technical_decisions_and_approve_forms_specific_implementation_gate

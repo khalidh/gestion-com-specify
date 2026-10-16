@@ -85,6 +85,24 @@ def test_actual_workspace_facts_are_classified_from_allowlisted_sources() -> Non
     assert "plan.md:L" in artifacts["target_architecture"]
 
 
+def test_oracle_forms_target_does_not_reuse_apex_tasks_or_claim_generation() -> None:
+    artifacts = analyze_repository(REPOSITORY_ROOT, "forms-target-test", target="oracle-forms")
+
+    assert artifacts["inventory"]["metadata"]["target"] == "oracle-forms"
+    assert artifacts["migration_proposal"]["status"] == "blocked_missing_target_plan"
+    assert artifacts["migration_proposal"]["steps"] == []
+    assert artifacts["migration_proposal"]["execution_allowed"] is False
+    assert "Version Oracle Forms/Reports" in artifacts["target_architecture"]
+    assert "aucun fichier `.fmb`/`.fmx`" in artifacts["target_architecture"]
+    assert "Étapes Oracle Forms proposées" in artifacts["modernization_report"]
+    assert "APEX pages" in artifacts["migration_proposal"]["limitation"]
+
+
+def test_unknown_target_is_rejected() -> None:
+    with pytest.raises(AnalysisError, match="Unsupported target"):
+        analyze_repository(REPOSITORY_ROOT, "unknown-target-test", target="other")
+
+
 def test_fixture_creates_sourced_outputs_only_under_generated_runs(tmp_path: Path) -> None:
     repo_root = _make_fixture(tmp_path / "repo")
     artifacts = analyze_repository(repo_root, "fixture-run")

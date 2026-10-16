@@ -4,6 +4,14 @@ pipeline:
   status: partial
   executor: python -m orchestrator.reverse_specification
   mode: read-only
+  target_profiles:
+    default: apex
+    supported:
+      - id: apex
+        status: existing
+      - id: oracle-forms
+        status: proposal-only
+        generation: disabled
   source_roots:
     - specs/001-gestion-commerciale/
     - database/changelog/
