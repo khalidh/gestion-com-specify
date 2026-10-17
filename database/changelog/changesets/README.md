@@ -6,6 +6,8 @@ Ce répertoire reçoit les changements de schéma et de données relus et approu
 
 `001_gc_customer_foundation.sql` met en place le premier parcours réel : tiers, clients, adresses, contacts, la vue `VW_GC_CUSTOMER_LIST` et `PKG_GC_PARTY`. Il ajoute trois clients de démonstration synthétiques.
 
+`003_gc_customer_crud.sql` ajoute `PKG_GC_CUSTOMER`, l'API de recherche, création, modification et suppression utilisée par le module Oracle Forms Clients. Les procédures ne valident pas la transaction; le formulaire pilote le commit après confirmation métier.
+
 Pour le prototype local, ce script a été appliqué avec SQL*Plus dans `ORCLPDB`; son exécution n'a pas été enregistrée dans `DATABASECHANGELOG`. Avant une mise à niveau gérée par Liquibase, initialiser ou synchroniser l'historique dans un environnement isolé pour éviter de réappliquer ces objets.
 
 ## Règles
